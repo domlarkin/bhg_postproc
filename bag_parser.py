@@ -25,7 +25,7 @@ def fix_active_bagfiles(path):
             #print(os.path.join(dirName, fname))
             if fname.endswith('.active'):
                 full_fn = os.path.join(dirName, fname)
-                cmd = 'rosbag reindex ' + full_fn + ';rosbag fix ' + full_fn + " " + full_fn.split('.')[0] + '.' + full_fn.split('.')[1]
+                cmd = 'rosbag reindex ' + full_fn + ';rosbag fix --force ' + full_fn + " " + full_fn.split('.')[0] + '.' + full_fn.split('.')[1]
                 print(cmd)
                 os.system(cmd)
 
@@ -40,7 +40,10 @@ def get_auto_times(inpath,outfile):
             last_alt = 0.0 
             if fname.endswith('.bag'):
                 bag_file = os.path.join(dirName, fname)
-                print(f'Parsing the file: {bag_file}')
+                cmd = 'rosbag reindex ' + full_fn
+                print(f'Re-indexing with: {cmd}')
+                os.system(cmd)
+                #print(f'Parsing the file: {bag_file}')
                 for topic, msg, t in rosbag.Bag(bag_file).read_messages():                        
                     hr_time = time.strftime("%Y-%m-%d %H:%M:%S.", time.localtime(t.to_time())) + str(t.nsecs)[:2]
                     outstring = f'{bag_file},{t.to_time()},{hr_time}' 
@@ -75,10 +78,10 @@ def get_auto_times(inpath,outfile):
                         last_alt = msg.relative
                                                                       
 if __name__ == '__main__':
-    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
-    csv_file = '/home/user1/DATA_ARCHIVE/BHGTest/automode_times.csv'
+    rootDir = '/media/user1/SSD4/BHG_Data'
+    csv_file = '/media/user1/SSD4/BHG_Data/automode_times.csv'
     # fix_active_bagfiles should be run at least once on a directory
-    #fix_active_bagfiles(rootDir)
+    fix_active_bagfiles(rootDir)
     get_auto_times(rootDir,csv_file)
 
 '''
