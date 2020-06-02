@@ -25,7 +25,7 @@ def fix_active_bagfiles(path):
             #print(os.path.join(dirName, fname))
             if fname.endswith('.active'):
                 full_fn = os.path.join(dirName, fname)
-                cmd = 'rosbag reindex ' + full_fn + ';rosbag fix ' + full_fn + " " + full_fn.split('.')[0] + '.' + full_fn.split('.')[1]
+                cmd = 'rosbag reindex ' + full_fn + ';rosbag fix --force ' + full_fn + " " + full_fn.split('.')[0] + '.' + full_fn.split('.')[1]
                 print(cmd)
                 os.system(cmd)
 
@@ -57,6 +57,10 @@ def get_auto_times(inpath,outfile):
 if __name__ == '__main__':
     rootDir = '/home/user1/DATA_ARCHIVE/YUMA'
     csv_file = '/home/user1/DATA_ARCHIVE/YUMA/automode_times.csv'
+    rootDir = '/media/user1/SSD4/BHG_Data'
+    csv_file = '/media/user1/SSD4/BHG_Data/automode_times.csv'
+
+
     # fix_active_bagfiles should be run at least once on a directory
     fix_active_bagfiles(rootDir)
     get_auto_times(rootDir,csv_file)
