@@ -30,35 +30,55 @@ def fix_active_bagfiles(path):
                 os.system(cmd)
 
 def get_auto_times(inpath,outfile):
-    outstring = 'Status,Filename,Crnt Mode, Last Mode, E Time,HR Time\n'
+    outstring = 'Status,Filename,E Time,HR Time\n'
     with open(outfile,'w') as f:
         f.write(outstring)
+    print(outstring)
     for dirName, subdirList, fileList in os.walk(inpath):
         for fname in fileList:
-            last_mode = '' 
+            last_mode = ''
+            last_alt = 0.0 
             if fname.endswith('.bag'):
                 bag_file = os.path.join(dirName, fname)
-                for topic, msg, t in rosbag.Bag(bag_file).read_messages():
-                    if topic == "/mavros/state":                        
-                        hr_time = time.strftime("%Y-%m-%d %H:%M:%S.", time.localtime(t.to_time())) + str(t.nsecs)[:2]
-                        outstring = f'{bag_file},{msg.mode},{last_mode},{t.to_time()},{hr_time}\n' 
+                print(f'Parsing the file: {bag_file}')
+                for topic, msg, t in rosbag.Bag(bag_file).read_messages():                        
+                    hr_time = time.strftime("%Y-%m-%d %H:%M:%S.", time.localtime(t.to_time())) + str(t.nsecs)[:2]
+                    outstring = f'{bag_file},{t.to_time()},{hr_time}' 
+                    if topic == "/mavros/state":
                         if msg.mode == 'AUTO.MISSION' and last_mode != 'AUTO.MISSION':
-                            outstring = "STARTED MISSION," + outstring 
+                            outstring = f"STARTED MISSION,{outstring},{msg.mode},{last_mode}"
                             with open(outfile,'a') as f:
-                                f.write(outstring)
-                            print(outstring)
-                        elif msg.mode != 'AUTO.MISSION' and last_mode == 'AUTO.MISSION':
-                            outstring = "STOPED MISSION," + outstring 
+                                f.write(outstring+'\n')
+                            print(outstring)                            
+                        elif msg.mode != 'AUTO.MISSION' and last_mode == 'AUTO.MISSION':                        
+                            outstring = f"STOPED MISSION,{outstring},{msg.mode},{last_mode}"  
                             with open(outfile,'a') as f:
-                                f.write(outstring)
+                                f.write(outstring+'\n')
                             print(outstring)
+                        if(last_mode != msg.mode):
+                            print(msg.mode,last_mode)
                         last_mode = msg.mode
 
+                    if topic == "/mavros/altitude":  
+                        if msg.relative > 5.0 and last_alt <= 5.0:
+                            outstring = f"Climbed above 5M,{outstring},{msg.relative},{last_alt}"  
+                            with open(outfile,'a') as f:
+                                f.write(outstring+'\n')
+                            print(outstring)                            
+                        if msg.relative < 5.0 and last_alt >= 5.0:
+                            outstring = f"Dropped below 5M,{outstring},{msg.relative},{last_alt}"  
+                            with open(outfile,'a') as f:
+                                f.write(outstring+'\n')
+                            print(outstring)
+#                        if(msg.relative > 1.0):
+#                            print(msg.relative,last_alt)
+                        last_alt = msg.relative
+                                                                      
 if __name__ == '__main__':
-    rootDir = '/home/user1/DATA_ARCHIVE/YUMA'
-    csv_file = '/home/user1/DATA_ARCHIVE/YUMA/automode_times.csv'
+    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
+    csv_file = '/home/user1/DATA_ARCHIVE/BHGTest/automode_times.csv'
     # fix_active_bagfiles should be run at least once on a directory
-    fix_active_bagfiles(rootDir)
+    #fix_active_bagfiles(rootDir)
     get_auto_times(rootDir,csv_file)
 
 '''
