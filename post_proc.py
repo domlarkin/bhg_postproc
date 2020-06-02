@@ -9,26 +9,21 @@ This module manages the directories for BHG. It does the following:
 Dependencies:
  sudo -H pip3 install pymavlink
  sudo -H pip3 install pandas 
-
 """
+
 import os
 import time
+import shutil
 from os.path import expanduser
 from pymavlink import mavutil
 from datetime import datetime
-
 
 def set_datadir():
     home = expanduser("~")
     data_dir = home + "/Data/"  
     print("===== The data directory is: %s =====" % data_dir) 
     return data_dir    
-    
-def convert_time(filename):
-    new_time = ''
-    filename.split('_')
-    return new_time    
-    
+
 def convert_bin_2_csv(makeall = True): 
     '''
     Converts an Ardupilot BIN file into a csv file. 
@@ -51,7 +46,7 @@ def convert_bin_2_csv(makeall = True):
     csv_filename = f'{log_dir}00000010.csv'
     if(not makeall):
         csv_filename = f'{log_dir}00000010_loc.csv'
-        
+
     message_types= set()
     with open(csv_filename, 'w') as f:
         while True:
@@ -77,34 +72,77 @@ def convert_bin_2_csv(makeall = True):
                 f.write(f'{outstring}\n')
 
 def make_datetime(name):
+    '''
+    Converts the date time in the filename into 2 outputs. 
+    Output 1 is the epoch time for mathmatical comparison
+    Output 2 is a human readable string that matches the one used by ardupilot
+    '''
     fname_split=name.split('_')    
     m_sec = round(int(fname_split[3][:3])/10.0)
     if m_sec < 10:
         m_sec = f'{m_sec}0'
     outstring=f'{fname_split[1][:4]}-{fname_split[1][4:6]}-{fname_split[1][6:8]} {fname_split[2][:2]}:{fname_split[2][2:4]}:{fname_split[2][4:6]}.{m_sec}'
-    
+
     #print(outstring) # 2020-05-28 18-02-08.44
     utc_time = datetime.strptime(outstring, "%Y-%m-%d %H:%M:%S.%f")
     epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
     return (epoch_time,outstring)
 
+def remove_empty_files(path):
+    '''
+    Search for and delete empty files. The Gobi camera creates empty files if it 
+    does not shutdown cleanly.
+    '''
+    for dirName, subdirList, fileList in os.walk(path):
+        for fname in fileList:
+            full_filename = os.path.join(dirName,fname)
+            if (os.path.getsize(full_filename) < 1):
+                print("Removing empty file at: %s" %full_filename)
+                os.remove(full_filename)
+
+def find_dirs_to_delete(path):
+    '''
+    Data directories are created before a mission is started. If the mission is aborted
+    or fails to run successfully this function deletes the entire mission directory.
+    '''
+    #TODO Only create directories when a mission starts.
+    #NOTE In later code, the directory cleanup code does this already.
+    dirs_to_delete = []
+    for root, dirs, files in os.walk(path):
+        for folder in dirs:
+            check_dir = os.path.join(root, folder)
+            num_files = sum([len(files) for r, d, files in os.walk(check_dir)])
+            if (num_files < 5): 
+                dirs_to_delete.append(check_dir)
+            #print(check_dir,num_files)
+        break
+    return dirs_to_delete
+    
+def delete_folders(dirs_to_delete):     
+    """ Deletes all unused directories except the symlink 'latest' """   
+    for folder in dirs_to_delete:
+        print("++++++ DELETING UNUSED FOLDER %s +++++++" % folder)
+        shutil.rmtree(folder)    
+
 if __name__ == '__main__':
     rootDir = set_datadir() + '20200528_180208_387820/'
-    rootDir = '/home/user1/Data/20200528_180208_387820/GOBI000088'
+    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
     #convert_bin_2_csv()
     #convert_bin_2_csv(False)
-    exit()
-      
-    for dirName, subdirList, fileList in os.walk(rootDir):
-        fileList = sorted(fileList)
-        print('Found directory: %s' % dirName)
-        for fname in fileList:
+    remove_empty_files(rootDir)
+    delete_folders(find_dirs_to_delete(rootDir))
+
+#    for dirName, subdirList, fileList in os.walk(rootDir):
+#        for fname in fileList:
+#            full_filename = os.path.join(dirName,fname)
+#            if (os.path.getsize(full_filename) < 10):
+#                print("Found empty file at: %s", full_filename)
+            #os.remove("ChangedFile.csv")
+
             #print(f'{fname}')          
-            if ('GOBI' in fname):
-                file_etime, file_stime = make_datetime(fname)
-                print(f'\t{fname}  date {file_stime}  etime: {file_etime}')
-
-
+#            if ('GOBI' in fname):
+#                file_etime, file_stime = make_datetime(fname)
+#                print(f'\t{fname}  date {file_stime}  etime: {file_etime}')
 
 '''
 AHR2 {TimeUS : 2955690875, Roll : -18.26, Pitch : -42.21, Yaw : 62.31, Alt : 4.670000076293945, Lat : 41.3906091, Lng : -73.95326349999999, Q1 : 0.817762017250061, Q2 : 0.05731012672185898, Q3 : -0.38087040185928345, Q4 : 0.427689790725708}
