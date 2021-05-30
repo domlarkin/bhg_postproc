@@ -24,9 +24,9 @@ def set_datadir():
     print("===== The data directory is: %s =====" % data_dir) 
     return data_dir    
 
-def get_ahrs_from_bin(filename): 
+def convert_bin(filename): 
     '''
-    Gets the AHR2 messeage from an Ardupilot BIN file and converts into a csv file.     
+    Gets the AHR2 messages from an Ardupilot BIN file and converts into a csv file.     
     filename: The BIN file to read in.    
     The output is written to csv at the same location and filename as the BIN, except 
     the file extension is changed from BIN to csv.
@@ -58,53 +58,6 @@ def get_ahrs_from_bin(filename):
             m_dict['HumanTime']=human_time
             writer.writerow(m_dict)
     return csv_filename
-            
-def convert_bin_2_csv(makeall = True): 
-    '''
-    Converts an Ardupilot BIN file into a csv file. 
-    makeall if true converts all message types.
-    makeall if false converts only message types listed in the m_type list
-    The output is in the form of:
-    Timestamp epoch seconds, timestamp human readable, the message.
-    '''
-    # TODO accept log dir as parameter
-    # TODO walk the directory for all BIN files
-    log_dir = '/home/user1/Downloads/APM_MAY27Flights/LOGS/'
-    filename = log_dir + "00000010.BIN"
-
-    notimestamps = False
-    planner_format = True
-    m_type=['GPA', 'GPS', 'AHR2', 'POS']
-    mlog = mavutil.mavlink_connection(filename, planner_format,
-                                      notimestamps,
-                                      robust_parsing=True)    
-    csv_filename = f'{log_dir}00000010.csv'
-    if(not makeall):
-        csv_filename = f'{log_dir}00000010_loc.csv'
-
-    message_types= set()
-    with open(csv_filename, 'w') as f:
-        while True:
-            outstring = ''
-            m = mlog.recv_match(condition=None, blocking=True)
-            if(not makeall):
-                m = mlog.recv_match(condition=None, type=m_type, blocking=True)
-
-            if m is None:
-                break
-            else:
-                message_types.add(m.get_type())
-            if True:
-                if notimestamps:
-                    outstring = f'{m}'
-                else:
-                    # TODO format the CSV better
-                    #print(m.to_dict().keys())
-                    outstring = "%s,%s.%02u,%s" % (m._timestamp,
-                        time.strftime("%Y-%m-%d %H:%M:%S",
-                                      time.localtime(m._timestamp)),
-                        int(m._timestamp*100.0)%100, m)
-                f.write(f'{outstring}\n')
 
 def make_datetime(name):
     '''
