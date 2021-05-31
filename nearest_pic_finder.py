@@ -11,6 +11,8 @@ import shutil
 from os.path import expanduser
 from datetime import datetime
 
+base_dir='/home/user1/PC_Data_Archive/TESTING/'
+
 def fname_2_time(ftime):
     try:
         utc_time = datetime.strptime(ftime, "%Y%m%d_%H%M%S_%f")
@@ -19,22 +21,23 @@ def fname_2_time(ftime):
         return 404 # Error, Solution Not Found
     return epoch_time
 
-in_filename='/home/user1/Data/20210527_170237_545/20210527_170237_545_boson.csv'
+in_filename=base_dir+'20210527_150821_971/20210527_150821_971_boson.csv'
 lwir_lines=[]
 with open(in_filename, 'r') as f:
     lwir_lines=f.readlines()
 
-in_filename='/home/user1/Data/20210527_170237_545/20210527_170237_545_flir.csv'
+in_filename=base_dir+'20210527_150821_971/20210527_150821_971_flir.csv'
 bfly_lines=[]
 with open(in_filename, 'r') as f:
     bfly_lines=f.readlines()
 
-out_filename='/home/user1/Data/20210527_170237_545/20210527_170237_545_flir_FILTERED.csv'
+out_filename=base_dir+'20210527_150821_971/20210527_150821_971_boson_FILTERED.csv'
 if os.path.exists(out_filename):
     os.remove(out_filename)
 
 j = 1
 prvs_delta = 0
+#prvs_time = 0
 for i in range(1,len(bfly_lines)):
     line=bfly_lines[i]
     bfly_time = fname_2_time(line.split(',')[1])
@@ -51,9 +54,11 @@ for i in range(1,len(bfly_lines)):
                 out_line=lwir_lines[j]
             break # Exit once nearest line is found
         prvs_delta = crnt_delta
+        #prvs_time = lwir_time
         j += 1
-        if (j > len(bfly_lines)):
-            out_line = "END OF LWIR FILE, NO MATCH FOUND"
+        if (j > len(lwir_lines)):
+            out_line = "END OF LWIR FILE, NO MATCH FOUND\n"
+            #print("NO MATCH",prvs_time,bfly_time,lwir_time)
             break # Exit if at end of file and no match found
 
     with open(out_filename, 'a') as f:
