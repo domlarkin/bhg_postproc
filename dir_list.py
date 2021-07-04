@@ -18,6 +18,7 @@ try:
 except OSError:
     pass
 s_flights=sorted(list(flights))
+
 for item in s_flights:
     with open(csv_filename, 'a') as csvfile:
         csvfile.write(item+'\n')
