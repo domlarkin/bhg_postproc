@@ -34,8 +34,8 @@ def convert_bin_2_csv(makeall = True):
     '''
     # TODO accept log dir as parameter
     # TODO walk the directory for all BIN files
-    log_dir = '/home/user1/Downloads/APM_MAY27Flights/LOGS/'
-    filename = log_dir + "00000010.BIN"
+    log_dir = '/home/user1/Projects/bhg_postproc/'
+    filename = log_dir + "disarm_test.bin"
 
     notimestamps = False
     planner_format = True
@@ -126,11 +126,11 @@ def delete_folders(dirs_to_delete):
 
 if __name__ == '__main__':
     rootDir = set_datadir() + '20200528_180208_387820/'
-    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
+    rootDir = '/home/user1/Projects/bhg_postproc'
     #convert_bin_2_csv()
-    #convert_bin_2_csv(False)
-    remove_empty_files(rootDir)
-    delete_folders(find_dirs_to_delete(rootDir))
+    convert_bin_2_csv(False)
+    #remove_empty_files(rootDir)
+    #delete_folders(find_dirs_to_delete(rootDir))
 
 #    for dirName, subdirList, fileList in os.walk(rootDir):
 #        for fname in fileList:

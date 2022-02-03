@@ -105,10 +105,29 @@ def get_file_lists(filenames):
         elif('FLIR' in item):
             vs_files.append(item)
     return(vs_files,ir_files)
+    
+def get_flight_times(filename):
+    with open(filename, 'r') as f:
+        #Read one line.The first line is the header, so discard the result
+        f.readline()
+        #Read all lines
+        lines = f.readlines()
+    
+    #Returns only n lines from the back
+    return lines[-1:]
+
+
+        
 
 if __name__ == '__main__':
-    rootDir = set_datadir() + '20200528_180208_387820/'
-    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
-    rootDir = set_datadir()
+#    rootDir = set_datadir() + '20200528_180208_387820/'
+#    rootDir = '/home/user1/DATA_ARCHIVE/BHGTest'
+#    rootDir = set_datadir()
+    binlog_dir = '/home/user1/Desktop/Yuma202201HarveyLogs/APM/LOGS'
+    csv_file = '/home/user1/Data/20220201_204450_463/20220201_204450.csv'
+    line = get_flight_times(csv_file)
+    print(line)
+    
+    
 
 
