@@ -20,12 +20,61 @@ from datetime import datetime
 import json
 import ast
 import copy
+import csv
 
 def set_datadir():
     home = expanduser("~")
     data_dir = home + "/Data/"  
     print("===== The data directory is: %s =====" % data_dir) 
     return data_dir    
+
+# Return the start and end times of a log file
+def get_bin_times(filename):
+    notimestamps = False
+    planner_format = True
+    m_type=['AHR2']
+    mlog = mavutil.mavlink_connection(filename, planner_format,
+                                      notimestamps,
+                                      robust_parsing=True) 
+    start_time = None
+    stop_time = None                                   
+    while True: 
+        m = mlog.recv_match(condition=None, type=m_type, blocking=True)
+        if m is None:
+            break # Exit the while loop when done with BIN file
+        if start_time is None or start_time > m._timestamp:
+            start_time = m._timestamp
+        if stop_time is None or stop_time < m._timestamp:
+            stop_time = m._timestamp
+    return (start_time,stop_time)
+
+# Create a csv file that has the start and stop times of each log file in this directory    
+def make_bin_times_csv(bin_dir):
+    binfile_list = []
+    for dirName, subdirList, fileList in os.walk(bin_dir):
+        for fname in fileList:
+            bin_filename = os.path.join(dirName,fname)
+            if bin_filename.endswith('BIN'):
+                binfile_list.append(bin_filename)
+                
+    binfile_list.sort()  
+    csv_filename = bin_dir + "/logfile_times.csv"
+    with open(csv_filename, 'w') as csvfile:    
+        for bin_filename in binfile_list:
+            (begin_time,end_time) = get_bin_times(bin_filename)    
+            if begin_time is None or end_time is None:
+                print(f"File {bin_filename} has no begin or end time.")
+                continue
+            human_begin = "%s.%02u" % (time.strftime("%Y-%m-%d,%H:%M:%S",
+                                      time.gmtime(begin_time)),
+                                      int(begin_time*100.0)%100)
+            human_end = "%s.%02u" % (time.strftime("%Y-%m-%d,%H:%M:%S",
+                                      time.gmtime(end_time)),
+                                      int(end_time*100.0)%100)                              
+
+            outstring = f"{bin_filename.split('/')[-1]},{begin_time},{end_time},{human_begin},{human_end}"
+            print(outstring)
+            csvfile.write(outstring+'\n')
 
 def convert_bin(filename): 
     '''
@@ -35,27 +84,30 @@ def convert_bin(filename):
     the file extension is changed from BIN to csv.
     returns the filename of the saved file
     '''
-    log_dir = '/home/user1/PC21_Collect/Archive/HarveyLogs/APM/LOGS/'
-    filename = log_dir + "00000010.BIN"
+#    log_dir = '/home/user1/PC21_Collect/Archive/HarveyLogs/APM/LOGS/'
+#    filename = log_dir + "00000010.BIN"
     notimestamps = False
     planner_format = True
     m_type=['AHR2']
     mlog = mavutil.mavlink_connection(filename, planner_format,
                                       notimestamps,
                                       robust_parsing=True)    
-    csv_filename = f'{log_dir}00000010.csv'
+#    csv_filename = f'{log_dir}00000010.csv'  
+    csv_filename = filename.split('.')[0] + ".csv"
+    print("csv_filename",csv_filename)
     csvfile=open(csv_filename, 'w')
     with open(csv_filename, 'w') as csvfile:
-        csv_columns = ['TimeStamp', 'HumanTime', 'Type', 'Lat', 'Lng', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Q1', 'Q2', 'Q3', 'Q4', 'TimeUS']
+        csv_columns = ['TimeStamp', 'HumanTime', 'mavpackettype', 'Type', 'Lat', 'Lng', 'Alt', 'Roll', 'Pitch', 'Yaw', 'Q1', 'Q2', 'Q3', 'Q4', 'TimeUS']
         writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
         writer.writeheader()
         while True: 
             m = mlog.recv_match(condition=None, type=m_type, blocking=True)
             if m is None:
-                break # Exit the while loop when done
+                break # Exit the while loop when done with BIN file
             m_dict=m.to_dict()
+            #print(m_dict)
             human_time = "%s.%02u" % (time.strftime("%Y-%m-%d %H:%M:%S",
-                                      time.localtime(m._timestamp)),
+                                      time.gmtime(m._timestamp)),
                                       int(m._timestamp*100.0)%100)
             m_dict['TimeStamp']=m._timestamp
             m_dict['HumanTime']=human_time
@@ -123,12 +175,14 @@ def make_st_datetime(str_time):
     
 # For Ardupilot message details see: https://ardupilot.org/plane/docs/logmessages.html    
 def get_flightbin_json(filename):
-#    csv_file = '/home/user1/Data/20220125_191846_355/20220125_191846.csv'    
+#    csv_file = '/home/user1/Data/20220125_191846_355/20220125_191846.csv'  
+  
     csv_file = '/home/user1/Data/20220125_181032_725/20220125_181032.csv'
+#    csv_file = '/home/user1/Data/20220125_191846_355/20220125_191846.csv'
     line = get_flight_times(csv_file) # ('20220125_191846_971', '20220125_192737_914')
     s_time = make_st_datetime(line[0])
     e_time = make_st_datetime(line[1])
-    print(s_time,e_time)
+    print(f"CSV File start time: {s_time}, end time: {e_time} and log file {filename}")
 
     notimestamps = False
     planner_format = True
@@ -136,13 +190,25 @@ def get_flightbin_json(filename):
     mlog = mavutil.mavlink_connection(filename, planner_format,
                                       notimestamps,
                                       robust_parsing=True) 
+
+#    in_filename='/home/user1/Data/20220125_181032_725/20220125_181032.csv'
+    csv_entries=[]
+    with open(csv_file, 'r') as f:
+        csv_entries=f.readlines()  
+
+    csv_entries = csv_entries[5:]
+
+    test_csvtime = csv_entries.pop(0).split(',')[1]
+
     logs=[]
     last_ahr2 = None
     while True:
         m = mlog.recv_match(condition=None, blocking=True) # gets the next line in the BIN file
         if m is None: # Exit the loop when at the end of the pixhawk log file
-            break 
+            print('----- At end of BIN file ----- ')
+            break #TODO Load next log file  
         m_dict=m.to_dict() 
+        print(m._timestamp)
         log_dt = datetime.utcfromtimestamp(m._timestamp) # Convert to a datetime object
 
         if (log_dt < s_time) or (log_dt > e_time): # Skip processing if log entry is before the flight begins
@@ -154,35 +220,38 @@ def get_flightbin_json(filename):
                                   int(m._timestamp*100.0)%100)
         m_dict['TimeStamp']=m._timestamp
         m_dict['HumanTime']=human_time
-        
-        # Replace NaN with None to allow for json parser to make valid json and create a list of log entries to write to file  
+
+        # Replace NaN with None to allow for json parser to make valid json and then create a list of log entries to write to file  
         logs.append(ast.literal_eval(str(m_dict).replace('nan','None')))           
 
-        # Get the timestamp for the pictures from the csv file and convert to epoch time
-        test_csvtime = '20220125_181144_988' #TODO get this from the csv file one line at a time.
+        #print("===",test_csvtime)            
         utc_time = datetime.strptime(test_csvtime, "%Y%m%d_%H%M%S_%f")
         csv_epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
         
         # If the message is AHR2 message then parse it for interpolation
         if (m_dict['mavpackettype'] == 'AHR2'):
             if (last_ahr2 is not None): 
-                print(last_ahr2['TimeStamp'],csv_epoch_time, m_dict['TimeStamp'])
+                print("{:.3f}, {:.5f}, {:.5f}".format(last_ahr2['TimeStamp'],csv_epoch_time, m_dict['TimeStamp']))
+
                 interpolated_msg = parse_ahr2(last_ahr2, m_dict,csv_epoch_time)
                 if(interpolated_msg is None):  
                     last_ahr2 = m_dict
                     continue
                 else:
-                    print(last_ahr2)
-                    print(interpolated_msg)
-                    print(m_dict)
+#                    print(last_ahr2)
+#                    print(interpolated_msg)
+                    print(test_csvtime)
+                    try:
+                        test_csvtime = csv_entries.pop(0).split(',')[1]
+                    except IndexError as e:
+                        print('----- At end of CSV file ----- ')                        
                     #TODO write new values out to csv file
-                    #TODO get the next line from the csv and do it again instead of break
-                    break
             else:
                 last_ahr2 = m_dict
 
-    # Write to a json file all Pixhawk log entries that apply to this flight.        
-    with open(test_csvtime+'.json', 'w') as fout:
+    # Write to a json file all Pixhawk log entries that apply to this flight.  
+    json_outiflename = csv_file.split('.')[:-1][0] + '.json'    
+    with open(json_outiflename, 'w') as fout:
         json.dump(logs, fout, indent=2) # indent causes new lines to be created, which makes it easier for text editors to parse
     return logs
     
@@ -203,7 +272,8 @@ def parse_ahr2(last_msg, crnt_msg,csv_time):
         return_msg['Yaw'] = round(bhg_interpolate(last_msg['Yaw'],crnt_msg['Yaw'],pct),2)
         return_msg['Roll'] = round(bhg_interpolate(last_msg['Roll'],crnt_msg['Roll'],pct),2)
         return_msg['Alt'] = round(bhg_interpolate(last_msg['Alt'],crnt_msg['Alt'],pct),3)
-        print("\n\n Found it =====      ALTS:", last_msg['Alt'],return_msg['Alt'],crnt_msg['Alt'],pct)
+#        print("\n\n Found it =====      ALTS:", last_msg['Alt'],return_msg['Alt'],crnt_msg['Alt'],pct)
+        print("\nFound it =====   {:.3f}  ALTS:{:.3f}, {:.3f}, {:.3f}, {:.3f}".format(csv_time,last_msg['Alt'],return_msg['Alt'],crnt_msg['Alt'],pct))
     return return_msg
 
 if __name__ == '__main__':
@@ -213,23 +283,13 @@ if __name__ == '__main__':
     binlog_dir = '/home/user1/Desktop/Yuma202201HarveyLogs/APM/LOGS'
 #    csv_file = '/home/user1/Data/20220131_185934_917/20220131_185934.csv'
 #    csv_file = '/home/user1/Data/20220125_191846_355/20220125_191846.csv'
-#    line = get_flight_times(csv_file) # ('20220125_191846_971', '20220125_192737_914')
-#    print(line)
-#    print(make_st_datetime(line[0]),make_st_datetime(line[1]))
 
-    # 1. Get next flight log csv file
-    # 2. Get start and end time of the file
-    # 3. Search bin directories for corresponding bin file
-    # 4. Save only bin entries during the flight into JSON file 
-    # 5. Interpolate position data between last and next point based on time
+    bin_filename = f'{binlog_dir}/00000077.BIN'
+    get_flightbin_json(bin_filename)
 
 
-    bin_filename = '/home/user1/Desktop/Yuma202201HarveyLogs/APM/LOGS/00000077.BIN'
-    logs = get_flightbin_json(bin_filename)
     
-#    
-#    for item in logs:
-#        print(item)
+    #make_bin_times_csv(binlog_dir)
 
 
 
